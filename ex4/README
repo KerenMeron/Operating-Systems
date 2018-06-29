@@ -1,0 +1,56 @@
+eldan, keren.meron
+Eldan Chodorov 201335965, Keren Meron 200039626
+EX: 4
+
+==== FILES ====
+CacheFS.cpp
+Cache.h
+Cache.cpp
+MakeFile
+README
+
+==== DESIGN ====
+
+Class FileBlock:
+This class is implemented in the Cache.cpp file and represents a block. I.e. there can be several
+blocks from the same file. Each FileBlock is distinguished by a path name (file name) and block
+index which is the index of the block inside its file.
+This class also hold information such as the frequency of which it has been read (hit) while in
+the cache.
+Each time a block gets evicted from the cache, its FileBlock is deleted. A new FileBlock is
+created every single time a miss occurs and a block is brought from disk to the cache.
+
+Class Cache:
+This class is implemented in the Cache.cpp file and represents a cache.
+It holds two main data structures:
+    - cache (vector): holds FileBlocks, at most of size of cache
+    - cacheMap (map): finds quickly the blocks in cache. stores file names with a set of the block
+     indices which are currently in the cache.
+The Cache class is responsible for inserting and removing blocks from the cache according to an
+eviction policy algorithm which it implements.
+
+CacheFS:
+The library uses the Cache class for most of the operations. It also holds two data structures:
+    - availableIds: a statically allocated array which allows properly allocating file
+      descriptors so that a very high number is less likely to be reached and holes made in
+      current file descriptor numbers. Each time a new file is opened, we scan this array and
+      search for the first available ID to appoint to the new file.
+    - fd_table (map): holds mapping between user fd and real fd assigned by the operating system.
+      it will also hold the path name of the fd, as that is the identity known by class Cache.
+
+Algorithm:
+We implemented FBR algo such that it is general and can be used for LRU and LFU as
+well. The algorithm is determined by specifying specific values for f_old and f_new. I.e. for LRU
+we want the cache to hold only the new section (so that the 'right most' block is evicted), and for
+LFU we want the cache to have only middle and end sections (so that it increments everyone's
+frequency).
+
+Data Structures:
+We attempted to use the most efficient containers suitable for our needs. In cases where we knew
+we needed to search the container a lot, we used maps, so to have O(1) search time. Such as in
+the fd_table where we would access using the key, or cacheMap which we would access using the file
+name (key).
+On the other hand, in cases where it was important for the elements to keep their order constant
+and for us to be able to access the container by an index, we used vectors. Such as for the cache
+container.
+

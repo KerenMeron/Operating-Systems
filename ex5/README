@@ -1,0 +1,72 @@
+eldan, keren.meron
+Eldan Chodorov 201335965, Keren Meron 200039626
+EX: 5
+
+FILES:
+whatsappClient.cpp
+whatsappServer.cpp
+MakeFile
+README
+
+DESIGN:
+
+We created two classes; Client and Server.
+
+Server
+The Server maintains two main databases; nameToFd which maps from a client's name to its socket
+fd, and groups which maps between a group name and the clients in that group.
+The server has a main while loop which always checks for input in three places: its  main socket,
+receiving new connections, its sockets (clients), receiving messages, and std::cin.
+In order to exit directly when exit is entered by the user, the server checks cin after each
+other operation it performs.
+Each time the server sends a message to a client, it calls recv afterwards, which blocks, in
+order to get confirmation of a successful sending, before moving on.
+
+Client
+The client has a main loop which checks its std::cin for input from the user, and its socket, for
+messages from the client. If the client sends a message to the server then it calls recv which
+blocks, in order to get a handshake confirmation for a successful send.
+The client checks input from the user for general errors such as invalid characters, before
+sending to the server.
+
+
+ANSWERS:
+
+Q1:
+1. First of all, the client will have to know which groups he is part of. This can be implemented
+ in one of two ways; we can add a command 'which_group' as well, which asks the server to return
+ the names of the groups that a client is part of. The other way is that when a group is created,
+  the server will send all members of the new group a message that they were added to group_name.
+Now, the client has a switch statement and a command dictionary, and checks if the input matches
+one of the valid command. We will add 'leave_group' as an additional valid command, and such that
+ the switch will send the server, a message 'leave_group group_name'.
+
+ 2. Upon accepting messages from clients, the server will have to recognize the leave_group
+ command (we will add that to its switch logic), and then he will simply find the group and
+ remove the client from it. After removing the client, the server will check if the group is
+ empty, and if it is, will remove it from the groups map database. He will do this as well when a
+  client un-registers.
+
+
+Q2:
+TCP is preferred over UDP in this exercise because we dealing with a lot of inter-client
+communication, so it is important for the users to know that the other side has received its
+message. Otherwise, one may think that his message was delivered, when in fact it was not. Its
+always nice to get the blue vv.
+
+Q3: Two examples for using UDP:
+1. Streaming of videos - It doesn't matter if we lose a few frames here or there, and more
+    importantly, because the server is transmitting large amounts of data, we don't want to delay it
+    further by using the handshake. Another reason is mentioned in the next example.
+2. VOIP (Skype) connections - voip communications rely on the data being sent in a certain order
+    on a time axis (not virtual time, real time). If we were to use FTP and some data was to fail in
+    sending, then it would be sent again and there would not be any synchronization in that.
+    Therefore we prefer to lose the data rather than send it again.
+
+Q4:
+One option for implementing this is having the server open a file upon start, and every so often
+write its state to that file. For example, in our implementation the server runs on a while loop.
+ The server will hold the file's file descriptor. In every iteration, it will open the file, update
+ the current state in the file, and save + close that file. The state that it updates will be all
+ the fds of sockets which are connected + their names, and all current groups with the fds
+ contained in each group.

@@ -1,0 +1,209 @@
+eldan, keren.meron
+Eldan Chodorov 201335965, Keren Meron 200039626
+EX: 3
+
+FILES:
+search.cpp
+MapReduceFramework.cpp
+MakeFile
+README
+
+DESIGN:
+
+A few non-trivial things we implemented / took into consideration:
+- used a semaphore to indicate the number of threads which have not finished running. I.e. if a
+MapReduce thread knows it has processed its last pair, it will call sem_wait on the semaphore.
+The semaphore is initialized to multiThreadLevel. Shuffle checks this semaphore each round and
+knows to perform its last operations and exit if the semaphore has reached zero.
+
+- Did not call join on MapExec, but rather used the above logic such that they will run and
+inform Shuffle themselves when they finish. Shuffle runs together.
+
+IMPLEMENTATION:
+
+In our implementation we held containers (implemented as vectors and
+queues) which held mutexes and threads. We created the Map threads and
+then the Shuffle thread which all ran simultaneously. In order to
+perform safe accessing and make sure that the Maps and Shuffle do not
+try to change a resource (specifically the output/input queue) together,
+we used a mutex to lock accessing the queue. Each output queue of a
+different thread has its own mutex, so that the shuffle does not block
+all queues, but only the one that he is currently trying to access.
+
+In order to prevent the shuffle thread from getting stuck while waiting
+for items when all Maps have finished, we used another semaphore. This
+semaphore symbols the number of threads that have completely finished
+running.
+
+We did not use join on shuffle and map, instead we let the maps finish
+their run and inform shuffle that they are finished. When shuffle knows
+that it has no work to do, it will exit by itself. On the other hand, we
+did call join on all the Reduce threads so to make sure that they finish
+all their work before performing the final merge. In addition, we used a
+mutex in order to block Reduce from running before shuffle is done. So
+this mutex is locked on start, unlocked when shuffle finishes, and then
+locked again upon reduce creation.
+
+For the shuffle cleanup implementation: shuffle has a while loop in
+which it checks the semaphore which tells it how many map threads are
+left running. If that semaphore reaches zero, then the shuffle knows
+there will not be any more insertions into their output queues. So
+shuffle exits the loop, but it still makes one more run of
+perform_shuffle() in which it performs the shuffle logic. This is to
+take care of any key,value pairs lastly inserted into the queues. Only
+after this final run, does shuffle know it is done and so unlocks the
+reduce mutex and exits.
+
+In order to release all resources allocated during the Framework run, we
+implemented a function which releases all needed. In addition, the
+framework (if parameterized as such) will delete all key2 and value2
+pairs which he uses during the program. When building the [value2]
+vector, since there will not be any key2 duplicates, he makes sure to
+delete those key2 instances which he will not insert into the new
+container. This container is the one on which the above memory releasing
+is performed.
+
+
+ANSWERS:
+
+Q1:
+Implementation with a condition variable will tell the shuffle when there are pairs ready in
+Maps' output queues. The conditional variable will be linked with a mutex wrapping around
+shuffle's code in which it extracts pairs from Maps' output queues. Shuffle will reach the
+cond_var in its code and will wait for x time. When a Map inserts a pair into its output queue,
+it will signal the cond_var, upon which the shuffle will wake and run.
+
+The reason we need to use pthread_cond_timedwait is because otherwise a deadlock will be caused
+in the 'last round'. If we were to use pthread_cond_wait, then the following could happen: say
+there are 2 Map threads. One of them inserts its last pair and signals the cond_var. Shuffle will
+run, in the middle of which the second Map thread will also insert its last pair. But Shuffle had
+already gone over his output queue and seen it was empty. So after shuffle reaches the cond_wait
+again, none of the Map threads will run again and the cond_var will not be signaled, leaving
+Shuffle hanging. In short - this is caused because cond_var does not have a counter, but only
+receives a temporal signal.
+
+Psuedo-Code:
+
+GLOBAL_SHUFFLE_FLAG = False
+
+= Shuffle =
+mutex_lock(lock)
+if (!GLOBAL_SHUFFLE_FLAG):
+    pthread_cond_timedwait(cond, lock, timespec)
+for queue in map_output_queues:
+    if not queue.empty:
+        extract pair and handle
+mutex_unlock(lock)
+
+= Map =
+get global index to kv1 container
+perform mapping func
+mutex_lock(lock)
+insert k2, v2 pair into output queue
+mutex_unlock(lock)
+pthread_cond_signal(cond)
+GLOBAL_SHUFFLE_FLAG = True
+
+
+Q2:
+One the one hand, we want more than one thread per core in order to optimize, but on the other
+hand context switches cause overhead. Obviously IO bounded tasks and CPU bounded tasks will have
+different requirements
+Assume we are using the Search program we used:
+number_threads = (Blocked_Time / Service_Time) + 1
+where:
+Blocked_Time is roughly the average of time each thread was blocked, i.e. for waiting on IO
+operations such as reading from file.
+Service_Time = estimated average processing time of each thread per request.
+
+First of all we checked and found that the computer we were running on has four cores.
+
+We incorporated measurements into our code in order to find the optimal number threads required.
+Running the Search program with different parameters of MultiThreadLevel produced the following
+results:
+
+num threads 2 total time 5616000 ns
+num threads 3 total time 158000 ns
+num threads 4 total time 4145000 ns
+num threads 5 total time 300000 ns
+num threads 6 total time 3559000 ns
+num threads 7 total time 443000 ns
+num threads 8 total time 3761000 ns
+num threads 9 total time 378000 ns
+num threads 10 total time 3629000 ns
+num threads 11 total time 577000 ns
+num threads 12 total time 3260000 ns
+num threads 13 total time 927000 ns
+num threads 14 total time 3495000 ns
+num threads 15 total time 1060000 ns
+
+First we noticed that the total time that the program took varies according to even or odd
+parameter. The odd numbers produced significantly better times,  because recall we use an extra
+thread for Shuffle. Therefore 4 threads are being run in total, on 4 cores. Obviously this will
+be the most optimal, because we have 100% utilization of available cores, while minimizing
+overhead of context switching.
+The best results occurred by running 4 threads in parallel, i.e. multiThreadLevel 3.
+
+ ***** If the computer we checked on had 8 cores, we would use multiThreadLevel 7 in order to get
+ best optimization of the cores. This is the answer to the question.
+
+ ** It should be said that we are performing IO bound operations, so we can expect the number of
+ threads to be less than 7. To correctly measure this, one needs to know the bounded time and
+ service time. The answer of 7 threads is relevant to CPU bound programs.
+
+Q3:
+a. Utilizing multi-cores
+Multi-processing allows different processes to be run on different cores, and therefore Galit
+will be fully utilizing multi-cores. Multi-threading limits a processes threads to run on the
+core/s that are designated to the specific process. So assuming each process is run on a single
+core, Moti will not be utilizing multi-cores. Obviously Nira will be running on a single core,
+and Danny as well because the operating system does not recognize user-level threads and runs
+them as a single thread.
+
+b. Nira will have no relevance to a schedular because there is nothing to schedule. Danny will be
+ able to create a schedular for his threads, but this is a user schedular only which schedules
+ the user-level threads. For multiprocessing a schedular can be created for the OS. Finally, for
+ multithreading we can create a schedular on the user level, not the os level. I.e. each process
+ will schedule its threads.
+
+ c. Moti and Galit will have the ability to progress because if one thread/process is blocked,
+ another can run. Danny will not be able to progress because the OS will mark the entire progress
+  as blocked as it does not recognize user level thread. Nira uses a single process and a single
+  thread, so if it is blocked, she has nothing else to progress with.
+
+d. Nira and Danny will be slow because they will have only a single thread and process running,
+so there will be absolutely no optimization. Galit's multiprocessing will be the fastest because
+it will be able to utilize all cores and so perform more operations simultaniously. Moti will
+also have good speed (though not as well as Galit) because it will be restricted to the cores
+delegated to their single process.
+
+e. There are two cases to take into consideration. If we are using a multicore system, then the
+multiprocessing will be fastest, followed by the multithreading. The user level threads and
+running a single thread and process will both be the same speed. If we are using a single cored
+system, then multiprocessing and multithreading will be slowest because of the overhead from
+context switching. The single thread and process will be fastest as there will not be any
+overhead. Finally, the user level threads will be a bit slower than the single thread run because
+ of overhead caused from context switching.
+
+Q4:
+User level threads share all of the above, because they belong to the same process and thread.
+Kernel level threads share the heap and global variables with their parent and children, and the
+stack is divided so that each thread receives its own 'stack scope'.
+Processes each have their own stack, heap and global variables, individual from their parent and
+children.
+
+Q5:
+Dead lock is when two or more say processes wait for a condition to be true / something to happen
+which
+is dependant on the other process. Say each process is waiting for the other to release a lock.
+Example: There are 3 keys and 2 users. Each user needs 2 keys in order to open a file. The
+first user takes key 1, the second user takes key 2. The first user has no more keys he is able
+to take, so he waits for the second user to finish with his keys and return them. The second user
+ is doing the same thing. They are both waiting. There is a deadlock.
+
+Livelock is when two or more processes continuously change states in order hand resource access
+to the other process. They are busy only with changing states and never execute their purpose.
+Example: In the above example, we reprogram so that there is a single key and each user is
+programmed to let the other user take that key first. In this case, the users will continuously
+only check how many keys/users there are, and never actually take it to open the file.
+

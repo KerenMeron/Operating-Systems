@@ -1,0 +1,60 @@
+eldan, keren.meron
+Eldan Chodorov 201335965, Keren Meron 200039626
+EX: 1
+
+FILES:
+osm.cpp - implementation of osm
+Makefile
+README
+
+
+Task 1:
+
+The file:
+1. Creates a new directory 'Welcome' in a certain mode '0775' (reading/writing/executing
+   permissions), and then creates a sub directory with path 'Welcome/To'.
+2. Creates and opens a file OS2016 in the above directory.
+3. Stores information about the above file.
+4. Writes to above file "<user>If you didn't read the course guidelines yet -- do it right now!
+                         <input to file>"
+5. Closes the file and removes it from file system.
+6. Removes created directories from file system.
+7. Exits thread.
+
+== mkdir(name, mode) ==
+Creates a new directory (in current working directory) with given name. This directory will have
+the given mode, which specifies attributes such as reading/writing/executing permissions. Returns
+0 if succesful, -1 otherwise.
+
+== open(name, flags, mode) ==
+Opens file with given name. If flags specify it (O_CREAT), will create the file if it does not
+exist). Other flags specify permissions (such as O_WRONLY - write only and _TRUNC - truncate file
+completely if already exists. Returns file descriptor, or -1 if unsuccessful.
+
+== fstat(file descriptor, struct stat *) ==
+Store information about given file descriptor in a stat struct (given by pointer). Stores
+information such as if a regular file, size, etc. Return 0 if successful, -1 otherwise.
+Note: was not useful for program run / understanding of purpose, because was not used.
+
+== write(file descriptor, content, count) ==
+Write content to file by given file descriptor. Write count amount of bytes. Returns amount of
+bytes which were written, or -1 if unsuccessful.
+
+== unlink(name) ==
+Remove specified file (by name) from system file. Return 0 if successful, -1 otherwise.
+
+== rmdir(name) ==
+Remove directory (by name) from system file. Return 0 if successful, -1 otherwise.
+
+== exit_group(status) ==
+Exit from running threads with given status. No return value.
+
+
+Task 2:
+
+We implemented a library osm which tests and compares running time of different calls.
+In this library we test:
+- empty function calls
+- traps
+- simple arithmetic operations
+

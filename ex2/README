@@ -1,0 +1,69 @@
+eldan, keren.meron
+Eldan Chodorov 201335965, Keren Meron 200039626
+EX: 2
+
+FILES:
+uthreads.cpp
+Makefile
+README
+
+ANSWERS:
+
+Q1:
+An example usage of user level threads would be in implementation of a debugger for an Integrated
+Development Environment (IDE). The debugger would use a thread for running the program, and
+another thread for displaying the current state to the user. Whenever a breakpoint is  hit,
+there is a switch in threads. When the user steps into lines, then the thread running the
+program is being run interchangeably. The debugger also makes use of saving the state, as the
+code run needs to 'remember' its variables and place in code. User level threads are the correct
+choice of use for a debugger because the program itself should keep on running while all resources
+needed by different threads are the same ones (as without the debugger), which is why kernel level
+threads should not be used in this case. User level threads are useful because the user itself
+(using the debugger) is able to control on the flow, and how long to run for each thread.
+
+Q2:
+Advantages of creating a new process:
+- If one tab freezes and crashes, then it won't affect the other tabs. That tab alone will be
+stuck while the others will keep on running.
+- Using different processes does not allow data sharing amongst the tabs, leading to security
+from simultaneous access.
+- Each tab will get more running time from the operating system (as a process) than it would as a
+ sub thread in a process.
+
+Disadvantages of creating a new process:
+- Using different processes limits the ability of accessing shared data.
+- Switching between processes creates more overhead time. One of the reasons is that the
+processes page is in a different location and needs to be retrieved.
+
+Q3:
+When I type on the keyboard 'kill <pid>' then on each stroke, the keyboard sends an interrupt to
+the operating system, which turns to its interrupt handler (if the interrupt is not masked). This
+handler will send the input to the shell (find that the shell is the current input receiver), i.e.
+the operating system will put the shell into running state. When the shell is done displaying the
+input (or after its time is up according to the scheduler), then scheduling will keep running
+as usual until I type in the next letter. This will go on repeatedly. When the shell finally
+receives the input of the Enter key, it will send a SIGTERM signal, along with the specified
+process id. The operating system will receive this and call close() on the process. The
+operating system will have the application's process in running mode and it will close itself by
+calling the exit() system call. This call masks signals (so to exit safely), sets some
+appropriate flags, calls some more internal exits(), frees objects associated with the process,
+and frees the memory. Finally, the parent (operating system) will free all remaining memory
+and the process will have been completely terminated.
+
+Q4:
+Real time is the physical time which occurs in real world and is running at all times. Virtual
+time is the actual time in which a process is running on the processor. Each process has its own
+virtual time, and as far as it is aware, that is the 'real' time of its world.
+
+A use of real time is for the clock running on a computer. The user wants to know the real world
+time, and so the clock must be updated according to a real world timer, and not just the virtual
+time which ticks only for the clock's process. Another example is a multi-player game played,
+which sets specified time for each player's turn. This time should be according to real world and
+not only for the game's virtual time.
+
+A use of virtual time would be for a program which has a timeout on some task. For example, if a
+program is trying to get information from online, and tries doing so from several servers. The
+program should try retrieving the information for a 10 seconds from each server, before moving to
+try a different server. These 10 seconds should not be timed in real time, because the program
+did not fail to retrieve information if it was nor running during the entire time. It should be
+allocated 10 seconds of actual running time, i.e. virtual time.
